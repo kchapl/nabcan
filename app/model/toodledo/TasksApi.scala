@@ -1,14 +1,8 @@
-/*
- * Copyright (c) 2013. Lorem ipsum dolor sit amet, consectetur adipiscing elit.
- * Morbi non lorem porttitor neque feugiat blandit. Ut vitae ipsum eget quam lacinia accumsan.
- * Etiam sed turpis ac ipsum condimentum fringilla. Maecenas magna.
- * Proin dapibus sapien vel ante. Aliquam erat volutpat. Pellentesque sagittis ligula eget metus.
- * Vestibulum commodo. Ut rhoncus gravida arcu.
- */
-
-package kchapl.toodledo
+package model.toodledo
 
 import org.joda.time.DateTime
+import net.liftweb.json.JsonAST.{JInt, JObject, JField, JString}
+import net.liftweb.json.JsonParser.parse
 
 
 object TasksApi {

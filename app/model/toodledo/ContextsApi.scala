@@ -1,5 +1,7 @@
 package model.toodledo
 
+import net.liftweb.json.JsonAST.{JObject, JField, JString}
+
 
 class ContextsApi(key: => String, httpClient: HttpClient = Registry.httpClient) {
 

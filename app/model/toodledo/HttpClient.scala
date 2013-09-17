@@ -1,5 +1,9 @@
 package model.toodledo
 
+import scala.concurrent.Await
+import dispatch._
+import concurrent.duration._
+
 
 trait HttpClient {
 
@@ -18,10 +22,10 @@ class DispatchHttpClient extends HttpClient {
                      query: Map[String, String] = Map(),
                      secure: Boolean = false): String = {
 
-    val request = ((apiVersion :: path).foldLeft((host(apiHost), secure) match {
+    val request = (apiVersion :: path).foldLeft((host(apiHost), secure) match {
       case (host, true) => host.secure
       case (host, false) => host
-    })((acc, item) => acc / item)) <<? query
+    })((acc, item) => acc / item) <<? query
 
     Await.result(for (responseBody <- Http(request OK as.String)) yield responseBody, 30 seconds)
   }

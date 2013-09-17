@@ -2,6 +2,7 @@ package model.toodledo
 
 import java.security.MessageDigest
 
+
 object Digest {
   private val md5Digest = MessageDigest.getInstance("MD5")
 

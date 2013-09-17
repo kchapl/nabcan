@@ -3,6 +3,8 @@ package model.toodledo
 import scalax.file.Path
 import org.joda.time.DateTime
 import scala.Some
+import net.liftweb.json.JsonAST.{JString, JField, JObject}
+import net.liftweb.json.JsonParser.parse
 
 
 class TokenAndExpiryTime(val token: String, expires: DateTime) {
@@ -35,7 +37,7 @@ trait TokenCache {
 
   def getToken: String = {
     currentTokenAndExpiryTime match {
-      case Some(current) if (current.isActive) => current.token
+      case Some(current) if current.isActive => current.token
       case _ => generateToken
     }
   }

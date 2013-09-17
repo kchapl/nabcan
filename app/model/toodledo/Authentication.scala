@@ -1,6 +1,8 @@
 package model.toodledo
 
 import Digest.md5
+import net.liftweb.json.JsonAST.{JString, JField, JObject}
+import net.liftweb.json.JsonParser.parse
 
 
 object Authentication {
