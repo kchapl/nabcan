@@ -1,7 +1,7 @@
 package model.toodledo
 
 
-object Client extends App {
+object Client extends scala.App {
 
   val appId = args(0)
   val appToken = args(1)

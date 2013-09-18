@@ -3,6 +3,7 @@ package model.toodledo
 import scala.concurrent.Await
 import dispatch._
 import concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 trait HttpClient {
