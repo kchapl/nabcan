@@ -1,6 +1,8 @@
 package controllers
 
 import play.api.mvc._
+import model.service.toodledo.Toodledo
+
 
 object Application extends Controller {
 
@@ -9,7 +11,8 @@ object Application extends Controller {
   }
 
   def board = Action {
-    Ok(views.html.index("Your new application is ready."))
+    val tasks = Toodledo.get("")
+    Ok(views.html.board(tasks))
   }
 
 }

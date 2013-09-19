@@ -1,4 +1,4 @@
-@(tasks: Seq[Task])
+@(tasks: Seq[model.Task])
 
 <html>
 <head>
@@ -6,8 +6,8 @@
 </head>
 <body>
 <ul>
-    @tasks map { task =>
-    <li>task.title</li>
+    @for(task <- tasks) {
+    <li>@task.title</li>
     }
 </ul>
 </body>

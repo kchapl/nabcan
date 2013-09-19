@@ -25,16 +25,16 @@ object TasksApi {
       JField("id", JString(id)) <- o
       JField("title", JString(title)) <- o
       JField("modified", JInt(modified)) <- o
-//      JField("completed", JInt(completed)) <- o
-//      JField("context", JString(context)) <- o
-//    } yield Task(id.toLong, title,
-//        new DateTime(modified.toLong * 1000),
-//        new DateTime(completed.toLong * 1000),
-//        context.toLong)
-  } yield (id.toLong, title, modified)
+    //      JField("completed", JInt(completed)) <- o
+    //      JField("context", JString(context)) <- o
+    //    } yield Task(id.toLong, title,
+    //        new DateTime(modified.toLong * 1000),
+    //        new DateTime(completed.toLong * 1000),
+    //        context.toLong)
+    } yield (id.toLong, title, modified)
 
-    val y =  parse(responseBody)
-//    y map (z => JObject(z))
+    val y = parse(responseBody)
+    //    y map (z => JObject(z))
     x
     Nil
   }
