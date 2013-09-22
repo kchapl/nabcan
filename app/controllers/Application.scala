@@ -10,9 +10,10 @@ object Application extends Controller {
     Ok(views.html.index("Your new application is ready."))
   }
 
-  def board = Action {
-    val tasks = Toodledo.get("")
-    Ok(views.html.board(tasks))
+  def contexts = Action.async {
+     Toodledo.getContexts("key")
+  }
+    Ok(views.html.board(Nil))
   }
 
 }
