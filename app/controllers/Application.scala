@@ -13,7 +13,10 @@ object Application extends Controller {
   def contexts = Action.async {
     for {
       c <- Toodledo.getContexts("key")
-    } yield Ok(views.html.contexts(c))
+    } yield c match {
+      case Left(x) => InternalServerError(views.html.error(x))
+      case Right(x) => Ok(views.html.contexts(x))
+    }
   }
 
   def board = TODO

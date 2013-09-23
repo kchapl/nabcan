@@ -9,13 +9,14 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Toodledo {
 
-  def getContexts(key: => String): Future[Seq[Context]] = {
+  def getContexts(key: => String): Future[Either[String, Seq[Context]]] = {
     val x = WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key).get()
     x map {
       response => {
         val z = response.json
         println(Json.prettyPrint(z))
-        Nil
+        val a = (z \ "errorDesc").as[String]
+        Left(a)
       }
     }
   }
