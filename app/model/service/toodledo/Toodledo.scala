@@ -5,11 +5,29 @@ import play.api.libs.json._
 import model.{Task, Context}
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import model.toodledo.{FileSysTokenCache, Authentication, App}
+import java.util.Properties
+import java.io.FileInputStream
 
 
 object Toodledo {
 
-  def getContexts(key: => String): Future[Either[String, Seq[Context]]] = {
+  private val props = new Properties
+  props.load(new FileInputStream(sys.props.get("user.home").get + "/tmp/td.properties"))
+  private val appId = props.getProperty("appId")
+  private val appToken = props.getProperty("appToken")
+  private val userEmail = props.getProperty("userEmail")
+  private val userPassword = props.getProperty("userPassword")
+
+  private val app = App(appId, appToken)
+  private val user = Authentication.lookUpUser(app, userEmail, userPassword)
+  private val tokenCache = new FileSysTokenCache(app, user)
+
+  private def key: String = {
+    Authentication.key(app, user, tokenCache)
+  }
+
+  def getContexts(key: => String = key): Future[Either[String, Seq[Context]]] = {
     val x = WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key).get()
     x map {
       response => {
