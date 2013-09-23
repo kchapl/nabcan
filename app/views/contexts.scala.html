@@ -1,0 +1,14 @@
+@(contexts: Seq[model.Context])
+
+<html>
+<head>
+    <title>Contexts</title>
+</head>
+<body>
+<ul>
+    @for(context <- contexts) {
+    <li>@context.name</li>
+    }
+</ul>
+</body>
+</html>

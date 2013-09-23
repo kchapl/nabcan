@@ -4,6 +4,7 @@ import play.api.libs.ws.WS
 import play.api.libs.json._
 import model.{Task, Context}
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 
 object Toodledo {
@@ -14,9 +15,9 @@ object Toodledo {
       response => {
         val z = response.json
         println(Json.prettyPrint(z))
+        Nil
       }
     }
-    Future[Nil]
   }
 
   def getTasksByContext(key: => String, context: String): Seq[Task] = {

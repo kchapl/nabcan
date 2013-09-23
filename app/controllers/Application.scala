@@ -11,9 +11,11 @@ object Application extends Controller {
   }
 
   def contexts = Action.async {
-     Toodledo.getContexts("key")
+    for {
+      c <- Toodledo.getContexts("key")
+    } yield Ok(views.html.contexts(c))
   }
-    Ok(views.html.board(Nil))
-  }
+
+  def board = TODO
 
 }
