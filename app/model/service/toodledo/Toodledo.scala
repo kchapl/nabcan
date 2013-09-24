@@ -33,14 +33,15 @@ object Toodledo {
       response => {
         val z = response.json
         println(Json.prettyPrint(z))
-        val res:JsResult[Context] = z.validate[Context]
-        val x = res.fold {
-          invalid = {e => println(e); e}
-          valid = { c => println(c); c.name}
-        }
-        val l = (z \ "errorDesc").asOpt[String]
-        val r = (z \ "errorDesc").asOpt[String]
-        Left(l)
+        implicit val customReads = Json.reads[Seq[Context]]
+        z.validate[Seq[Context]].fold(
+          invalid = {
+            e => println(e); Left(e.flatMap(_._2).head.message)
+          },
+          valid = {
+            c => println(c); Right(c)
+          }
+        )
       }
     }
   }
