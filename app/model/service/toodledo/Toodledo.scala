@@ -13,7 +13,7 @@ import java.io.FileInputStream
 object Toodledo {
 
   private val props = new Properties
-  props.load(new FileInputStream(sys.props.get("user.home").get + "/tmp/td.properties"))
+  props.load(new FileInputStream(sys.props.get("user.home").get + "/Desktop/tdconf"))
   private val appId = props.getProperty("appId")
   private val appToken = props.getProperty("appToken")
   private val userEmail = props.getProperty("userEmail")
@@ -33,8 +33,14 @@ object Toodledo {
       response => {
         val z = response.json
         println(Json.prettyPrint(z))
-        val a = (z \ "errorDesc").as[String]
-        Left(a)
+        val res:JsResult[Context] = z.validate[Context]
+        val x = res.fold {
+          invalid = {e => println(e); e}
+          valid = { c => println(c); c.name}
+        }
+        val l = (z \ "errorDesc").asOpt[String]
+        val r = (z \ "errorDesc").asOpt[String]
+        Left(l)
       }
     }
   }
