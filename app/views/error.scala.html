@@ -1,10 +1,11 @@
-@(errMessage: String)
+@(err: model.service.Toodledo.Error)
 
 <html>
 <head>
     <title>Error</title>
 </head>
 <body>
-<p>@errMessage</p>
+<p>@err.id</p>
+<p>@err.description</p>
 </body>
 </html>

@@ -1,4 +1,4 @@
-package model.service.toodledo
+package model.service
 
 import play.api.libs.ws.WS
 import play.api.libs.json._
@@ -29,9 +29,11 @@ object Toodledo {
     Authentication.key(app, user, tokenCache)
   }
 
+  case class Error(id: Int, description: String)
+
   private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
 
-  def getContexts(key: => String = key): Future[Either[ToodledoError, Seq[Context]]] = {
+  def getContexts(key: => String = key): Future[Either[Error, Seq[Context]]] = {
     WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
       response =>
         val json = response.json
@@ -39,7 +41,7 @@ object Toodledo {
         json.validate[Seq[Context]] fold(
           // TODO: validate toodledo error and pass that through
           invalid = e => {
-            Left(ToodledoError(1, "error"))
+            Left(Error(1, "error"))
           },
           valid = Right(_)
           )
@@ -58,6 +60,3 @@ object Toodledo {
   }
 
 }
-
-
-case class ToodledoError(id: Int, description: String)

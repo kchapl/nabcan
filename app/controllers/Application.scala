@@ -1,7 +1,7 @@
 package controllers
 
 import play.api.mvc._
-import model.service.toodledo.Toodledo
+import model.service.Toodledo
 import scala.concurrent.ExecutionContext.Implicits.global
 
 
