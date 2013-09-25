@@ -8,6 +8,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import model.toodledo.{FileSysTokenCache, Authentication, App}
 import java.util.Properties
 import java.io.FileInputStream
+import play.api.libs.functional.syntax._
 
 
 object Toodledo {
@@ -27,13 +28,14 @@ object Toodledo {
     Authentication.key(app, user, tokenCache)
   }
 
+  // TODO: just return contexts and throw anything else as an exception
   def getContexts(key: => String = key): Future[Either[String, Seq[Context]]] = {
     val x = WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key).get()
     x map {
       response => {
         val z = response.json
         println(Json.prettyPrint(z))
-        implicit val customReads = Json.reads[Seq[Context]]
+        implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
         z.validate[Seq[Context]].fold(
           invalid = {
             e => println(e); Left(e.flatMap(_._2).head.message)
