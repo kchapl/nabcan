@@ -24,24 +24,25 @@ object Toodledo {
   private val user = Authentication.lookUpUser(app, userEmail, userPassword)
   private val tokenCache = new FileSysTokenCache(app, user)
 
+  // TODO: sort this out
   private def key: String = {
     Authentication.key(app, user, tokenCache)
   }
 
-  def getContexts(key: => String = key): Future[Seq[Context]] = {
-    val x = WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key).get()
-    x map {
-      response => {
-        val z = response.json
-        println(Json.prettyPrint(z))
-        implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
-        z.validate[Seq[Context]].fold(
-          invalid =
-            e => throw new RuntimeException(e.toString())
-          ,
-          valid = { _}
-        )
-      }
+  private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
+
+  def getContexts(key: => String = key): Future[Either[ToodledoError, Seq[Context]]] = {
+    WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
+      response =>
+        val json = response.json
+        println(Json.prettyPrint(json))
+        json.validate[Seq[Context]] fold(
+          // TODO: validate toodledo error and pass that through
+          invalid = e => {
+            Left(ToodledoError(1, "error"))
+          },
+          valid = Right(_)
+          )
     }
   }
 
@@ -57,3 +58,6 @@ object Toodledo {
   }
 
 }
+
+
+case class ToodledoError(id: Int, description: String)
