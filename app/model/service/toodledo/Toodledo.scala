@@ -28,8 +28,7 @@ object Toodledo {
     Authentication.key(app, user, tokenCache)
   }
 
-  // TODO: just return contexts and throw anything else as an exception
-  def getContexts(key: => String = key): Future[Either[String, Seq[Context]]] = {
+  def getContexts(key: => String = key): Future[Seq[Context]] = {
     val x = WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key).get()
     x map {
       response => {
@@ -37,12 +36,10 @@ object Toodledo {
         println(Json.prettyPrint(z))
         implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
         z.validate[Seq[Context]].fold(
-          invalid = {
-            e => println(e); Left(e.flatMap(_._2).head.message)
-          },
-          valid = {
-            c => println(c); Right(c)
-          }
+          invalid =
+            e => throw new RuntimeException(e.toString())
+          ,
+          valid = { _}
         )
       }
     }
