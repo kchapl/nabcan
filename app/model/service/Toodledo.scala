@@ -1,6 +1,6 @@
 package model.service
 
-import play.api.libs.ws.WS
+import play.api.libs.ws.{Response, WS}
 import play.api.libs.json._
 import model.{Task, Context}
 import scala.concurrent.Future
@@ -41,17 +41,37 @@ object Toodledo {
       response =>
         val json = response.json
         println(Json.prettyPrint(json))
-        json.validate[Seq[Context]] fold{
+        json.validate[Seq[Context]] fold {
           invalid = e =>
-//            val jsResult: JsResult[Exception] = json.validate[Exception]
-//            val x = jsResult.fold{
-//               invalid = {case (k,v) => Exception(1,"err")},
-//              valid = {e => Left(e)}
-//            }
-//            x
-          Left(Exception(1,"")),
+          //            val jsResult: JsResult[Exception] = json.validate[Exception]
+          //            val x = jsResult.fold{
+          //               invalid = {case (k,v) => Exception(1,"err")},
+          //              valid = {e => Left(e)}
+          //            }
+          //            x
+            Left(Exception(1, "")),
           valid = Right(_)
         }
+    }
+  }
+
+  def getContexts2(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
+    WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
+      response => parseAs[Seq[Context]](response.json)
+    }
+  }
+
+  def parseAs[T](json: JsValue): Either[Exception, T] = {
+    println(Json.prettyPrint(json))
+    json.validate[Seq[T]] fold{
+      invalid = e => {
+        val x: JsResult[Exception] = json.validate[Exception]
+        x.fold {
+          invalid = {e => Left(Exception(1,"err"))},
+          valid = Left(_)
+        }
+      },
+      valid = Right(_)
     }
   }
 
