@@ -12,11 +12,11 @@ object Application extends Controller {
   }
 
   def contexts = Action.async {
-    for {
-      c <- Toodledo.getContexts()
-    } yield c match {
-      case Left(x) => InternalServerError(views.html.error(x))
-      case Right(x) => Ok(views.html.contexts(x))
+    Toodledo.getContexts() map {
+      _ match {
+        case Left(exception) => InternalServerError(views.html.exception(exception))
+        case Right(contexts) => Ok(views.html.contexts(contexts))
+      }
     }
   }
 

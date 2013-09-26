@@ -29,22 +29,29 @@ object Toodledo {
     Authentication.key(app, user, tokenCache)
   }
 
-  case class Error(id: Int, description: String)
+  case class Exception(id: Int, description: String)
 
+  private implicit val exceptionReads = ((__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String])(Exception)
   private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
 
-  def getContexts(key: => String = key): Future[Either[Error, Seq[Context]]] = {
+  // TODO refactor parse
+  // TODO refactor with key
+  def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
     WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
       response =>
         val json = response.json
         println(Json.prettyPrint(json))
-        json.validate[Seq[Context]] fold(
-          // TODO: validate toodledo error and pass that through
-          invalid = e => {
-            Left(Error(1, "error"))
-          },
+        json.validate[Seq[Context]] fold{
+          invalid = e =>
+//            val jsResult: JsResult[Exception] = json.validate[Exception]
+//            val x = jsResult.fold{
+//               invalid = {case (k,v) => Exception(1,"err")},
+//              valid = {e => Left(e)}
+//            }
+//            x
+          Left(Exception(1,"")),
           valid = Right(_)
-          )
+        }
     }
   }
 
