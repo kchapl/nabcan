@@ -1,6 +1,6 @@
 package model.service
 
-import play.api.libs.ws.{Response, WS}
+
 import play.api.libs.json._
 import model.{Task, Context}
 import scala.concurrent.Future
@@ -9,6 +9,7 @@ import model.toodledo.{FileSysTokenCache, Authentication, App}
 import java.util.Properties
 import java.io.FileInputStream
 import play.api.libs.functional.syntax._
+import play.api.libs.ws.WS
 
 
 object Toodledo {
@@ -34,44 +35,22 @@ object Toodledo {
   private implicit val exceptionReads = ((__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String])(Exception)
   private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
 
-  // TODO refactor parse
   // TODO refactor with key
   def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
     WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
-      response =>
+      response => {
         val json = response.json
         println(Json.prettyPrint(json))
-        json.validate[Seq[Context]] fold {
-          invalid = e =>
-          //            val jsResult: JsResult[Exception] = json.validate[Exception]
-          //            val x = jsResult.fold{
-          //               invalid = {case (k,v) => Exception(1,"err")},
-          //              valid = {e => Left(e)}
-          //            }
-          //            x
-            Left(Exception(1, "")),
+        json.validate[Seq[Context]] fold(
+          invalid = _ => {
+            json.validate[Exception] fold(
+              invalid = exception => throw new RuntimeException(exception.toString()),
+              valid = Left(_)
+              )
+          },
           valid = Right(_)
-        }
-    }
-  }
-
-  def getContexts2(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
-    WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
-      response => parseAs[Seq[Context]](response.json)
-    }
-  }
-
-  def parseAs[T](json: JsValue): Either[Exception, T] = {
-    println(Json.prettyPrint(json))
-    json.validate[Seq[T]] fold{
-      invalid = e => {
-        val x: JsResult[Exception] = json.validate[Exception]
-        x.fold {
-          invalid = {e => Left(Exception(1,"err"))},
-          valid = Left(_)
-        }
-      },
-      valid = Right(_)
+          )
+      }
     }
   }
 
