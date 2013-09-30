@@ -34,7 +34,14 @@ object Toodledo {
 
   private implicit val exceptionReads = ((__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String])(Exception)
   private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
-  private implicit val taskReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String])(Context)
+
+  private def parseTasks(json: JsValue): JsResult[Seq[Task]] = {
+    for {
+      task <- json.asInstanceOf[JsArray].value
+      id <- (task \ "id").validate[String]
+      title <- (task \ "title").validate[String]
+    } yield Task(id.toInt, title)
+  }
 
   // TODO refactor with key
   def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
@@ -55,12 +62,12 @@ object Toodledo {
     }
   }
 
-  def getTasksByContext(key: => String=key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
+  def getTasksByContext(key: => String = key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
     WS.url("http://api.toodledo.com/2/tasks/get.php?key=%s" format key) get() map {
       response => {
         val json = response.json
         println(Json.prettyPrint(json))
-        json.validate[Seq[Task]] fold(
+        parseTasks(json) fold(
           invalid = _ => {
             json.validate[Exception] fold(
               invalid = exception => throw new RuntimeException(exception.toString()),

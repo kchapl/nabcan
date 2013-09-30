@@ -20,11 +20,11 @@ object Application extends Controller {
     }
   }
 
-  def board(id: Long) = Action.async {
+  def board(id: Int) = Action.async {
     Toodledo.getTasksByContext(contextId = id) map {
       _ match {
         case Left(exception) => InternalServerError(views.html.exception(exception))
-        case Right(tasks) => Ok(views.html.tasks(tasks))
+        case Right(tasks) => Ok(views.html.board(tasks))
       }
     }
   }
