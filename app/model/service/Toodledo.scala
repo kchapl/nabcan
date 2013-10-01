@@ -43,8 +43,8 @@ object Toodledo {
         val json = response.json
         println(Json.prettyPrint(json))
         json.validate[Seq[Context]] fold(
-          invalid = _ => {
-            json.validate[Exception] fold(
+          invalid = {
+            _ => json.validate[Exception] fold(
               invalid = exception => throw new RuntimeException(exception.toString()),
               valid = Left(_)
               )
@@ -61,11 +61,10 @@ object Toodledo {
         val json = response.json
         println(Json.prettyPrint(json))
         json.validate[Exception] fold(
-          invalid = _ => {
-            val taskJson = json.asInstanceOf[JsArray].value.tail
-            taskJson.head.validate[Task] fold(
+          invalid = {
+            _ => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
               invalid = exception => throw new RuntimeException(exception.toString()),
-              valid = (task => Right(Seq(task)))
+              valid = Right(_)
               )
           },
           valid = Left(_)
