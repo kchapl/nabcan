@@ -34,14 +34,7 @@ object Toodledo {
 
   private implicit val exceptionReads = ((__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String])(Exception)
   private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
-
-  private def parseTasks(json: JsValue): JsResult[Seq[Task]] = {
-    for {
-      task <- json.asInstanceOf[JsArray].value
-      id <- (task \ "id").validate[String]
-      title <- (task \ "title").validate[String]
-    } yield Task(id.toInt, title)
-  }
+  private implicit val taskReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String])(Task)
 
   // TODO refactor with key
   def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
@@ -67,14 +60,15 @@ object Toodledo {
       response => {
         val json = response.json
         println(Json.prettyPrint(json))
-        parseTasks(json) fold(
+        json.validate[Exception] fold(
           invalid = _ => {
-            json.validate[Exception] fold(
+            val taskJson = json.asInstanceOf[JsArray].value.tail
+            taskJson.head.validate[Task] fold(
               invalid = exception => throw new RuntimeException(exception.toString()),
-              valid = Left(_)
+              valid = (task => Right(Seq(task)))
               )
           },
-          valid = Right(_)
+          valid = Left(_)
           )
       }
     }
