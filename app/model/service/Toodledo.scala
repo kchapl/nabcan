@@ -32,15 +32,24 @@ object Toodledo {
 
   case class Exception(id: Int, description: String)
 
-  private implicit val exceptionReads = ((__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String])(Exception)
-  private implicit val contextReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String])(Context)
-  private implicit val taskReads = ((__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String])(Task)
+  private implicit val exceptionReads = (
+    (__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String]
+    )(Exception)
+
+  private implicit val contextReads = (
+    (__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String]
+    )(Context)
+
+  private implicit val taskReads = (
+    (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
+    )(Task)
 
   // TODO refactor with key
   def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
     WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
       response => {
         val json = response.json
+        //TODO: log
         println(Json.prettyPrint(json))
         json.validate[Seq[Context]] fold(
           invalid = {
@@ -56,15 +65,19 @@ object Toodledo {
   }
 
   def getTasksByContext(key: => String = key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
-    WS.url("http://api.toodledo.com/2/tasks/get.php?key=%s" format key) get() map {
+    WS.url("http://api.toodledo.com/2/tasks/get.php?fields=context&key=%s" format key) get() map {
       response => {
         val json = response.json
+        //TODO: log
         println(Json.prettyPrint(json))
         json.validate[Exception] fold(
           invalid = {
             _ => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
               invalid = exception => throw new RuntimeException(exception.toString()),
-              valid = Right(_)
+              valid = {
+                allTasks =>
+                  Right(allTasks filter (_.contextId == contextId))
+              }
               )
           },
           valid = Left(_)
