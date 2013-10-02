@@ -52,13 +52,11 @@ object Toodledo {
         //TODO: log
         println(Json.prettyPrint(json))
         json.validate[Seq[Context]] fold(
-          invalid = {
-            _ => json.validate[Exception] fold(
-              invalid = exception => throw new RuntimeException(exception.toString()),
-              valid = Left(_)
-              )
-          },
-          valid = Right(_)
+          invalid => json.validate[Exception] fold(
+            invalid => throw new RuntimeException(invalid.toString()),
+            valid => Left(valid)
+            ),
+          valid => Right(valid)
           )
       }
     }
@@ -71,16 +69,11 @@ object Toodledo {
         //TODO: log
         println(Json.prettyPrint(json))
         json.validate[Exception] fold(
-          invalid = {
-            _ => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
-              invalid = exception => throw new RuntimeException(exception.toString()),
-              valid = {
-                allTasks =>
-                  Right(allTasks filter (_.contextId == contextId))
-              }
-              )
-          },
-          valid = Left(_)
+          invalid => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
+            invalid => throw new RuntimeException(invalid.toString()),
+            valid => Right(valid filter (_.contextId == contextId))
+            ),
+          valid => Left(valid)
           )
       }
     }
