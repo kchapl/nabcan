@@ -59,28 +59,14 @@ object Toodledo {
       )
   }
 
-  private def parse2(response: Response): Either[Toodledo.Exception, Seq[Task]] = {
+  private def parse2[T](response: Response, pr: JsValue => JsResult[Seq[T]]): Either[Toodledo.Exception, Seq[T]] = {
     val json = response.json
     //TODO: log
     println(Json.prettyPrint(json))
     json.validate[Exception] fold(
-      invalid => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
+      invalid => pr(json) fold(
         invalid => throw new RuntimeException(invalid.toString()),
-        valid => Right(valid)
-        ),
-      valid => Left(valid)
-      )
-  }
-
-  private def parse3(response: Response, contextId: Int): Either[Toodledo.Exception, Seq[Task]] = {
-    val json = response.json
-    //TODO: log
-    println(Json.prettyPrint(json))
-    json.validate[Exception] fold(
-      invalid => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
-        invalid => throw new RuntimeException(invalid.toString()),
-        valid => Right(valid filter (_.contextId == contextId))
-        ),
+        valid => Right(valid)),
       valid => Left(valid)
       )
   }
@@ -91,23 +77,20 @@ object Toodledo {
   }
 
   def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
-    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map parse2
+    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map {
+      r =>
+        parse2(r, {
+          json =>
+            JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
+        })
+    }
   }
 
   def getTasksByContext(key: => String = key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
-    val x = getTasks()
     for {
-      y <- x
-      z = y.fold(
-       Left(l) => Left(l),
-       Right(r) => Right(r)
-      )
-      y.
-    }
-    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map {
-      response => {
-        parse3(response, contextId)
-      }
-    }
+      tasksOrException <- getTasks()
+      tasks <- tasksOrException.right
+      tasks filter (_.contextId == contextId)
+    } yield tasks
   }
 }
