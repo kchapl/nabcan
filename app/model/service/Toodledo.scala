@@ -9,7 +9,7 @@ import model.toodledo.{FileSysTokenCache, Authentication, App}
 import java.util.Properties
 import java.io.FileInputStream
 import play.api.libs.functional.syntax._
-import play.api.libs.ws.WS
+import play.api.libs.ws.{Response, WS}
 
 
 object Toodledo {
@@ -44,39 +44,70 @@ object Toodledo {
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
+  private val apiPath = "http://api.toodledo.com/2"
+
+  private def parse(response: Response): Either[Toodledo.Exception, Seq[Context]] = {
+    val json = response.json
+    //TODO: log
+    println(Json.prettyPrint(json))
+    json.validate[Seq[Context]] fold(
+      invalid => json.validate[Exception] fold(
+        invalid => throw new RuntimeException(invalid.toString()),
+        valid => Left(valid)
+        ),
+      valid => Right(valid)
+      )
+  }
+
+  private def parse2(response: Response): Either[Toodledo.Exception, Seq[Task]] = {
+    val json = response.json
+    //TODO: log
+    println(Json.prettyPrint(json))
+    json.validate[Exception] fold(
+      invalid => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
+        invalid => throw new RuntimeException(invalid.toString()),
+        valid => Right(valid)
+        ),
+      valid => Left(valid)
+      )
+  }
+
+  private def parse3(response: Response, contextId: Int): Either[Toodledo.Exception, Seq[Task]] = {
+    val json = response.json
+    //TODO: log
+    println(Json.prettyPrint(json))
+    json.validate[Exception] fold(
+      invalid => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
+        invalid => throw new RuntimeException(invalid.toString()),
+        valid => Right(valid filter (_.contextId == contextId))
+        ),
+      valid => Left(valid)
+      )
+  }
+
   // TODO refactor with key
   def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
-    WS.url("http://api.toodledo.com/2/contexts/get.php?key=%s" format key) get() map {
-      response => {
-        val json = response.json
-        //TODO: log
-        println(Json.prettyPrint(json))
-        json.validate[Seq[Context]] fold(
-          invalid => json.validate[Exception] fold(
-            invalid => throw new RuntimeException(invalid.toString()),
-            valid => Left(valid)
-            ),
-          valid => Right(valid)
-          )
-      }
-    }
+    WS.url(s"$apiPath/contexts/get.php?key=$key") get() map parse
+  }
+
+  def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
+    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map parse2
   }
 
   def getTasksByContext(key: => String = key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
-    WS.url("http://api.toodledo.com/2/tasks/get.php?fields=context&key=%s" format key) get() map {
+    val x = getTasks()
+    for {
+      y <- x
+      z = y.fold(
+       Left(l) => Left(l),
+       Right(r) => Right(r)
+      )
+      y.
+    }
+    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map {
       response => {
-        val json = response.json
-        //TODO: log
-        println(Json.prettyPrint(json))
-        json.validate[Exception] fold(
-          invalid => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]] fold(
-            invalid => throw new RuntimeException(invalid.toString()),
-            valid => Right(valid filter (_.contextId == contextId))
-            ),
-          valid => Left(valid)
-          )
+        parse3(response, contextId)
       }
     }
   }
-
 }
