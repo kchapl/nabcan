@@ -25,6 +25,8 @@ object Toodledo {
   private val user = Authentication.lookUpUser(app, userEmail, userPassword)
   private val tokenCache = new FileSysTokenCache(app, user)
 
+  private val apiPath = "http://api.toodledo.com/2"
+
   // TODO: sort this out
   private def key: String = {
     Authentication.key(app, user, tokenCache)
@@ -44,22 +46,7 @@ object Toodledo {
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
-  private val apiPath = "http://api.toodledo.com/2"
-
-  private def parse(response: Response): Either[Toodledo.Exception, Seq[Context]] = {
-    val json = response.json
-    //TODO: log
-    println(Json.prettyPrint(json))
-    json.validate[Seq[Context]] fold(
-      invalid => json.validate[Exception] fold(
-        invalid => throw new RuntimeException(invalid.toString()),
-        valid => Left(valid)
-        ),
-      valid => Right(valid)
-      )
-  }
-
-  private def parse2[T](response: Response, pr: JsValue => JsResult[Seq[T]]): Either[Toodledo.Exception, Seq[T]] = {
+  private def parse[T](pr: JsValue => JsResult[Seq[T]])(response: Response): Either[Toodledo.Exception, Seq[T]] = {
     val json = response.json
     //TODO: log
     println(Json.prettyPrint(json))
@@ -73,16 +60,12 @@ object Toodledo {
 
   // TODO refactor with key
   def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
-    WS.url(s"$apiPath/contexts/get.php?key=$key") get() map parse
+    WS.url(s"$apiPath/contexts/get.php?key=$key") get() map parse(_.validate[Seq[Context]])
   }
 
   def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
-    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map {
-      r =>
-        parse2(r, {
-          json =>
-            JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
-        })
+    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map parse {
+      json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
     }
   }
 
