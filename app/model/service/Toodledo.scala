@@ -87,10 +87,10 @@ object Toodledo {
   }
 
   def getTasksByContext(key: => String = key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
-    for {
-      tasksOrException <- getTasks()
-      tasks <- tasksOrException.right
-      tasks filter (_.contextId == contextId)
-    } yield tasks
+    getTasks() map {
+      _ fold(
+        e => Left(e),
+        tasks => Right(tasks filter (_.contextId == contextId)))
+    }
   }
 }
