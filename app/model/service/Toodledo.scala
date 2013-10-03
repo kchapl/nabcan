@@ -1,19 +1,29 @@
 package model.service
 
-
 import play.api.libs.json._
-import model.{Task, Context}
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
-import model.toodledo.{FileSysTokenCache, Authentication, App}
 import java.util.Properties
 import java.io.FileInputStream
 import play.api.libs.functional.syntax._
-import play.api.libs.ws.{Response, WS}
+import play.api.libs.ws.WS
+import model.toodledo.Digest._
+import model.toodledo.App
+import play.api.libs.json.JsArray
+import model.toodledo.FileSysTokenCache
+import play.api.libs.ws.Response
+import net.liftweb.json.JsonAST.JObject
+import scala.Some
+import model.toodledo.User
+import net.liftweb.json.JsonAST.JField
+import net.liftweb.json.JsonAST.JString
+import model.Context
+import model.Task
 
 
 object Toodledo {
 
+  // TODO: store these better
   private val props = new Properties
   props.load(new FileInputStream(sys.props.get("user.home").get + "/Desktop/tdconf"))
   private val appId = props.getProperty("appId")
@@ -22,15 +32,25 @@ object Toodledo {
   private val userPassword = props.getProperty("userPassword")
 
   private val app = App(appId, appToken)
-  private val user = Authentication.lookUpUser(app, userEmail, userPassword)
-  private val tokenCache = new FileSysTokenCache(app, user)
 
-  private val apiUrl = "http://api.toodledo.com/2"
+  private val user = {
+    val x= lookupUser(userEmail,userPassword)
+
+    val sig = md5(userEmail + app.token)
+    val x = get("account/lookup", Some(s"appid=${app.id}&sig=${sig}&email=${userEmail}&pass=${userPassword}"), secure = true)
+    val y = x map parse(_.validate[String])
+
+
+    val JObject(List(JField("userid", JString(id)))) = parse(responseBody)
+    User(id, userPassword)
+  }
 
   // TODO: sort this out
-  private def key: String = {
-    Authentication.key(app, user, tokenCache)
-  }
+  private val tokenCache = new FileSysTokenCache(app, user)
+
+  private val apiUrl = "api.toodledo.com/2"
+
+  private def key = md5(md5(user.password) + app.token + tokenCache.getToken)
 
   case class Exception(id: Int, description: String)
 
@@ -46,9 +66,11 @@ object Toodledo {
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
-  // TODO refactor with key
-  private def get(path: String, queryString: Option[String] = None, key: => String = key) = {
-    WS.url(s"$apiUrl/$path/get.php?$queryString&key=$key") get()
+  private def get(path: String, queryString: Option[String] = None, secure: Boolean = false) = {
+    val url = queryString.foldLeft(s"http://${apiUrl}/${path}.php?key=$key") {
+      (prefix, suffix) => s"${prefix}&${suffix}"
+    }
+    WS.url(url) get()
   }
 
   private def parse[T](parseContent: JsValue => JsResult[T])(response: Response) = {
@@ -63,13 +85,18 @@ object Toodledo {
       )
   }
 
-  def getContexts: Future[Either[Exception, Seq[Context]]] = {
-    get("contexts") map parse(_.validate[Seq[Context]])
+  def lookupUser(email: String, password: String): Future[Either[Exception, User]] = {
+    val sig = md5(email + app.token)
+    val queryString = Some(s"appid=${app.id}&sig=${sig}&email=${email}&pass=${password}")
+    get("account/lookup", queryString, secure = true) map parse(_.validate[User])
   }
 
+  def getContexts: Future[Either[Exception, Seq[Context]]] = {
+    get("contexts/get") map parse(_.validate[Seq[Context]])
+  }
 
   def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
-    get("tasks", Some("fields=context")) map parse {
+    get("tasks/get", Some("fields=context")) map parse {
       json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
     }
   }
