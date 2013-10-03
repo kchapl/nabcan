@@ -25,7 +25,7 @@ object Toodledo {
   private val user = Authentication.lookUpUser(app, userEmail, userPassword)
   private val tokenCache = new FileSysTokenCache(app, user)
 
-  private val apiPath = "http://api.toodledo.com/2"
+  private val apiUrl = "http://api.toodledo.com/2"
 
   // TODO: sort this out
   private def key: String = {
@@ -46,25 +46,30 @@ object Toodledo {
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
-  private def parse[T](pr: JsValue => JsResult[Seq[T]])(response: Response): Either[Toodledo.Exception, Seq[T]] = {
+  // TODO refactor with key
+  private def get(path: String, queryString: Option[String] = None, key: => String = key) = {
+    WS.url(s"$apiUrl/$path/get.php?$queryString&key=$key") get()
+  }
+
+  private def parse[T](parseContent: JsValue => JsResult[T])(response: Response) = {
     val json = response.json
     //TODO: log
     println(Json.prettyPrint(json))
     json.validate[Exception] fold(
-      invalid => pr(json) fold(
+      invalid => parseContent(json) fold(
         invalid => throw new RuntimeException(invalid.toString()),
         valid => Right(valid)),
       valid => Left(valid)
       )
   }
 
-  // TODO refactor with key
-  def getContexts(key: => String = key): Future[Either[Exception, Seq[Context]]] = {
-    WS.url(s"$apiPath/contexts/get.php?key=$key") get() map parse(_.validate[Seq[Context]])
+  def getContexts: Future[Either[Exception, Seq[Context]]] = {
+    get("contexts") map parse(_.validate[Seq[Context]])
   }
 
+
   def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
-    WS.url(s"$apiPath/tasks/get.php?fields=context&key=$key") get() map parse {
+    get("tasks", Some("fields=context")) map parse {
       json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
     }
   }
