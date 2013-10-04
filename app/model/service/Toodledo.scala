@@ -1,24 +1,20 @@
 package model.service
 
 import play.api.libs.json._
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.Properties
 import java.io.FileInputStream
 import play.api.libs.functional.syntax._
 import play.api.libs.ws.WS
 import model.toodledo.Digest._
-import model.toodledo.App
+import model.toodledo.{User, App, FileSysTokenCache}
 import play.api.libs.json.JsArray
-import model.toodledo.FileSysTokenCache
 import play.api.libs.ws.Response
-import net.liftweb.json.JsonAST.JObject
 import scala.Some
-import model.toodledo.User
-import net.liftweb.json.JsonAST.JField
-import net.liftweb.json.JsonAST.JString
 import model.Context
 import model.Task
+import concurrent.duration._
 
 
 object Toodledo {
@@ -33,20 +29,13 @@ object Toodledo {
 
   private val app = App(appId, appToken)
 
-  private val user = {
-    val x= lookupUser(userEmail,userPassword)
-
-    val sig = md5(userEmail + app.token)
-    val x = get("account/lookup", Some(s"appid=${app.id}&sig=${sig}&email=${userEmail}&pass=${userPassword}"), secure = true)
-    val y = x map parse(_.validate[String])
-
-
-    val JObject(List(JField("userid", JString(id)))) = parse(responseBody)
-    User(id, userPassword)
+  private lazy val user: User = {
+    val result = Await.result(lookupUser(userEmail, userPassword), atMost = 2.seconds)
+    result.right.get
   }
 
   // TODO: sort this out
-  private val tokenCache = new FileSysTokenCache(app, user)
+  private lazy val tokenCache = new FileSysTokenCache(app, user)
 
   private val apiUrl = "api.toodledo.com/2"
 
@@ -58,6 +47,10 @@ object Toodledo {
     (__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String]
     )(Exception)
 
+  private implicit val userReads = (
+    (__ \ 'id).read[String] and (__ \ 'password).read[String]
+    )(User)
+
   private implicit val contextReads = (
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'name).read[String]
     )(Context)
@@ -67,8 +60,8 @@ object Toodledo {
     )(Task)
 
   private def get(path: String, queryString: Option[String] = None, secure: Boolean = false) = {
-    val url = queryString.foldLeft(s"http://${apiUrl}/${path}.php?key=$key") {
-      (prefix, suffix) => s"${prefix}&${suffix}"
+    val url = queryString.foldLeft(s"http://$apiUrl/$path.php?key=$key") {
+      (prefix, suffix) => s"$prefix&$suffix"
     }
     WS.url(url) get()
   }
@@ -87,7 +80,7 @@ object Toodledo {
 
   def lookupUser(email: String, password: String): Future[Either[Exception, User]] = {
     val sig = md5(email + app.token)
-    val queryString = Some(s"appid=${app.id}&sig=${sig}&email=${email}&pass=${password}")
+    val queryString = Some(s"appid=${app.id}&sig=$sig&email=$email&pass=$password")
     get("account/lookup", queryString, secure = true) map parse(_.validate[User])
   }
 
