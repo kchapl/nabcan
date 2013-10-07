@@ -8,24 +8,29 @@ import java.io.FileInputStream
 import play.api.libs.functional.syntax._
 import play.api.libs.ws.WS
 import model.toodledo.Digest._
-import model.toodledo._
 import concurrent.duration._
 import net.liftweb.json.JsonParser._
-import model.toodledo.App
 import play.api.libs.json.JsArray
 import play.api.libs.ws.Response
 import net.liftweb.json.JsonAST.JObject
 import scala.Some
-import model.toodledo.User
 import net.liftweb.json.JsonAST.JField
 import model.Context
 import net.liftweb.json.JsonAST.JString
 import model.Task
 import scalax.file.Path
 import org.joda.time.DateTime
+import model.toodledo.{HttpClient, Registry, TokenAndExpiryTime}
+import model.service.Toodledo.User
 
 
 object Toodledo {
+
+  case class Exception(id: Int, description: String)
+
+  case class App(id: String, token: String)
+
+  case class User(id: String, password: String)
 
   // TODO: store these better
   private val props = new Properties
@@ -37,23 +42,18 @@ object Toodledo {
 
   private val app = App(appId, appToken)
 
+  private val apiUrl = "api.toodledo.com/2"
+
   private lazy val user: User = {
     val result = Await.result(lookupUser(userEmail, userPassword), atMost = 2.seconds)
     result.right.get
   }
 
-  // TODO: sort this out
-  private lazy val tokenCache = new FileSysTokenCache(app, user)
-
-  private val apiUrl = "api.toodledo.com/2"
-
-  //private lazy val key = md5(md5(user.password) + app.token + tokenCache.getToken)
   private lazy val key = {
-    val token: String = tokenCache.getToken
+    val tokenResult = Await.result(genToken, atMost = 2.seconds)
+    val token = tokenResult.right.get
     md5(md5(user.password) + app.token + token)
   }
-
-  case class Exception(id: Int, description: String)
 
   private implicit val exceptionReads = (
     (__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String]
@@ -70,6 +70,10 @@ object Toodledo {
   private implicit val taskReads = (
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
+
+  private def lookUp(path: String, queryString: String) = {
+    WS.url(s"http://$apiUrl/$path.php?$queryString") get()
+  }
 
   private def get(path: String, queryString: Option[String] = None, secure: Boolean = false) = {
     val aKey = key
@@ -94,13 +98,13 @@ object Toodledo {
 
   def lookupUser(email: String, password: String): Future[Either[Exception, User]] = {
     val sig = md5(email + app.token)
-    val queryString = Some(s"appid=${app.id}&sig=$sig&email=$email&pass=$password")
-    get("account/lookup", queryString, secure = true) map parse(_.validate[User])
+    val queryString = s"appid=${app.id}&sig=$sig&email=$email&pass=$password"
+    lookUp("account", queryString) map parse(_.validate[User])
   }
 
   def genToken: Future[Either[Exception, String]] = {
     val sig = md5(user.id + app.token)
-    val queryString = Some(s"userid=${user.id}&appid=${app.id}&sig=${sig}")
+    val queryString = Some(s"userid=${user.id}&appid=${app.id}&sig=$sig")
     get("account/token", queryString, secure = true) map parse {
       json => json.validate[String]
     }
@@ -128,8 +132,8 @@ object Toodledo {
 
 trait TokenCache {
 
-  val app: App
-  val user: User
+  val app: Toodledo.App
+  val user: Toodledo.User
   val httpClient: HttpClient
 
   def currentTokenAndExpiryTime: Option[TokenAndExpiryTime]
@@ -159,7 +163,7 @@ trait TokenCache {
 }
 
 
-case class FileSysTokenCache(app: App, user: User, httpClient: HttpClient = Registry.httpClient) extends TokenCache {
+case class FileSysTokenCache(app: Toodledo.App, user: User, httpClient: HttpClient = Registry.httpClient) extends TokenCache {
   val tokenStore = Path.fromString(sys.props.get("java.io.tmpdir").get) / "td.token.txt"
 
   def currentTokenAndExpiryTime: Option[TokenAndExpiryTime] = {
