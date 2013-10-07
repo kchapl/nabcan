@@ -8,13 +8,21 @@ import java.io.FileInputStream
 import play.api.libs.functional.syntax._
 import play.api.libs.ws.WS
 import model.toodledo.Digest._
-import model.toodledo.{User, App, FileSysTokenCache}
+import model.toodledo._
+import concurrent.duration._
+import net.liftweb.json.JsonParser._
+import model.toodledo.App
 import play.api.libs.json.JsArray
 import play.api.libs.ws.Response
+import net.liftweb.json.JsonAST.JObject
 import scala.Some
+import model.toodledo.User
+import net.liftweb.json.JsonAST.JField
 import model.Context
+import net.liftweb.json.JsonAST.JString
 import model.Task
-import concurrent.duration._
+import scalax.file.Path
+import org.joda.time.DateTime
 
 
 object Toodledo {
@@ -39,7 +47,11 @@ object Toodledo {
 
   private val apiUrl = "api.toodledo.com/2"
 
-  private def key = md5(md5(user.password) + app.token + tokenCache.getToken)
+  //private lazy val key = md5(md5(user.password) + app.token + tokenCache.getToken)
+  private lazy val key = {
+    val token: String = tokenCache.getToken
+    md5(md5(user.password) + app.token + token)
+  }
 
   case class Exception(id: Int, description: String)
 
@@ -60,7 +72,9 @@ object Toodledo {
     )(Task)
 
   private def get(path: String, queryString: Option[String] = None, secure: Boolean = false) = {
-    val url = queryString.foldLeft(s"http://$apiUrl/$path.php?key=$key") {
+    val aKey = key
+    //val url = queryString.foldLeft(s"http://$apiUrl/$path.php?key=$key") {
+    val url = queryString.foldLeft(s"http://$apiUrl/$path.php?key=$aKey") {
       (prefix, suffix) => s"$prefix&$suffix"
     }
     WS.url(url) get()
@@ -84,6 +98,14 @@ object Toodledo {
     get("account/lookup", queryString, secure = true) map parse(_.validate[User])
   }
 
+  def genToken: Future[Either[Exception, String]] = {
+    val sig = md5(user.id + app.token)
+    val queryString = Some(s"userid=${user.id}&appid=${app.id}&sig=${sig}")
+    get("account/token", queryString, secure = true) map parse {
+      json => json.validate[String]
+    }
+  }
+
   def getContexts: Future[Either[Exception, Seq[Context]]] = {
     get("contexts/get") map parse(_.validate[Seq[Context]])
   }
@@ -100,5 +122,63 @@ object Toodledo {
         e => Left(e),
         tasks => Right(tasks filter (_.contextId == contextId)))
     }
+  }
+}
+
+
+trait TokenCache {
+
+  val app: App
+  val user: User
+  val httpClient: HttpClient
+
+  def currentTokenAndExpiryTime: Option[TokenAndExpiryTime]
+
+  def generateToken: String = {
+    val sig = md5(user.id + app.token)
+    val responseBody = httpClient.makeGetRequest(List("account", "token.php"),
+      Map("userid" -> user.id, "appid" -> app.id, "sig" -> sig),
+      secure = true)
+
+    val JObject(List(JField("token", JString(token)))) = parse(responseBody)
+
+    cache(token)
+    token
+  }
+
+  def cache(token: String)
+
+  def flush()
+
+  def getToken: String = {
+    currentTokenAndExpiryTime match {
+      case Some(current) if current.isActive => current.token
+      case _ => generateToken
+    }
+  }
+}
+
+
+case class FileSysTokenCache(app: App, user: User, httpClient: HttpClient = Registry.httpClient) extends TokenCache {
+  val tokenStore = Path.fromString(sys.props.get("java.io.tmpdir").get) / "td.token.txt"
+
+  def currentTokenAndExpiryTime: Option[TokenAndExpiryTime] = {
+    if (!tokenStore.exists) None
+    else {
+      val serialized = tokenStore.string
+      if (serialized.isEmpty) None
+      else {
+        val parts = serialized.split(":")
+        Some(new TokenAndExpiryTime(parts(0), new DateTime(parts(1).toLong)))
+      }
+    }
+  }
+
+  def cache(token: String) {
+    tokenStore.write("%s:%s".format(token, new DateTime().plusHours(3).getMillis))
+  }
+
+  def flush() {
+    tokenStore.deleteIfExists()
   }
 }
