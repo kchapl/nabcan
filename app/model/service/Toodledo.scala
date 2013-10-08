@@ -35,17 +35,18 @@ object Toodledo {
   private val apiUrl = "api.toodledo.com/2"
 
   private lazy val userId = {
-    val result = Await.result(lookupUserId(userEmail, userPassword), atMost = 2.seconds)
+    // TODO: need to wait?
+    val result = Await.result(lookUpUserId(userEmail, userPassword), atMost = 30.seconds)
     result.right.get
   }
 
   private lazy val key = {
-    val token = Await.result(genToken, atMost = 2.seconds)
+    val token = Await.result(genToken, atMost = 30.seconds)
     md5(md5(userPassword) + app.token + token)
   }
 
   private implicit val exceptionReads = (
-    (__ \ 'errorCode).read[String].map(_.toInt) and (__ \ 'errorDesc).read[String]
+    (__ \ 'errorCode).read[Int] and (__ \ 'errorDesc).read[String]
     )(Exception)
 
   private implicit val contextReads = (
@@ -56,7 +57,7 @@ object Toodledo {
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
-
+  // TODO: refactor these
   private def doGet(url: String) = {
     // TODO :log
     println(s"HTTP GET $url")
@@ -92,7 +93,7 @@ object Toodledo {
       )
   }
 
-  def lookupUserId(email: String, password: String): Future[Either[Exception, String]] = {
+  def lookUpUserId(email: String, password: String): Future[Either[Exception, String]] = {
     val sig = md5(email + app.token)
     val queryString = s"appid=${app.id}&sig=$sig&email=$email&pass=$password"
     lookUp("account/lookup", queryString) map parse {
