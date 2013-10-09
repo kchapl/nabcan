@@ -41,8 +41,8 @@ object Toodledo {
   }
 
   private lazy val key = {
-    val token = Await.result(genToken, atMost = 30.seconds)
-    md5(md5(userPassword) + app.token + token)
+    val sessionToken = Await.result(genToken, atMost = 30.seconds).right.get
+    md5(md5(userPassword) + app.token + sessionToken)
   }
 
   private implicit val exceptionReads = (
@@ -60,11 +60,11 @@ object Toodledo {
   // TODO: refactor these
   private def doGet(url: String) = {
     // TODO :log
-    println(s"HTTP GET $url")
+    println(s"GET $url")
     WS.url(url) get()
   }
 
-  private def lookUp(path: String, queryString: String) = doGet(s"http://$apiUrl/$path.php?$queryString")
+  private def lookUp(path: String, queryString: String) = doGet(s"https://$apiUrl/$path.php?$queryString")
 
   private def get(path: String, queryString: String, secure: Boolean = true) = {
     val protocol = "https"
