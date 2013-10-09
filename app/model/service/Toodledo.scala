@@ -15,7 +15,6 @@ import scala.Some
 import model.Context
 import model.Task
 
-
 object Toodledo {
 
   case class Exception(id: Int, description: String)
@@ -116,14 +115,6 @@ object Toodledo {
   def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
     getWithKey("tasks/get", Some("fields=context")) map parse {
       json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
-    }
-  }
-
-  def getTasksByContext(key: => String = key, contextId: Int): Future[Either[Exception, Seq[Task]]] = {
-    getTasks() map {
-      _ fold(
-        e => Left(e),
-        tasks => Right(tasks filter (_.contextId == contextId)))
     }
   }
 }
