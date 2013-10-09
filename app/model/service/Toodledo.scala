@@ -2,7 +2,6 @@ package model.service
 
 import play.api.libs.json._
 import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
 import java.util.Properties
 import java.io.FileInputStream
 import play.api.libs.functional.syntax._
@@ -10,7 +9,6 @@ import play.api.libs.ws.WS
 import model.toodledo.Digest._
 import concurrent.duration._
 import play.api.libs.json.JsArray
-import play.api.libs.ws.Response
 import scala.Some
 import model.Context
 import model.Task
@@ -35,12 +33,12 @@ object Toodledo {
 
   private lazy val userId = {
     // TODO: need to wait?
-    val result = Await.result(lookUpUserId(userEmail, userPassword), atMost = 30.seconds)
+    val result = Await.result(getUserId, atMost = 30.seconds)
     result.right.get
   }
 
   private lazy val key = {
-    val sessionToken = Await.result(genToken, atMost = 30.seconds).right.get
+    val sessionToken = Await.result(getToken, atMost = 30.seconds).right.get
     md5(md5(userPassword) + app.token + sessionToken)
   }
 
@@ -56,64 +54,55 @@ object Toodledo {
     (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
-  // TODO: refactor these
-  private def doGet(url: String) = {
+  private def get[T](path: String, queryString: String, secure: Boolean = true)
+                    (parse: JsValue => JsResult[T]): Future[Either[Exception, T]] = {
+    val protocol = if (secure) "https" else "http"
+    val url = s"$protocol://$apiUrl/$path.php?$queryString"
     // TODO :log
     println(s"GET $url")
-    WS.url(url) get()
-  }
-
-  private def lookUp(path: String, queryString: String) = doGet(s"https://$apiUrl/$path.php?$queryString")
-
-  private def get(path: String, queryString: String, secure: Boolean = true) = {
-    val protocol = "https"
-    val url = s"$protocol://$apiUrl/$path.php?$queryString"
-    doGet(url)
-  }
-
-  private def getWithKey(path: String, queryString: Option[String] = None, secure: Boolean = false) = {
-    val aKey = key
-    //val url = queryString.foldLeft(s"http://$apiUrl/$path.php?key=$key") {
-    val url = queryString.foldLeft(s"http://$apiUrl/$path.php?key=$aKey") {
-      (prefix, suffix) => s"$prefix&$suffix"
+    for (response <- WS.url(url) get()) yield {
+      val json = response.json
+      //TODO: log
+      println(Json.prettyPrint(json))
+      json.validate[Exception] fold(
+        invalid => parse(json) fold(
+          invalid => throw new RuntimeException(invalid.toString()),
+          valid => Right(valid)),
+        valid => Left(valid)
+        )
     }
-    doGet(url)
   }
 
-  private def parse[T](parseContent: JsValue => JsResult[T])(response: Response) = {
-    val json = response.json
-    //TODO: log
-    println(Json.prettyPrint(json))
-    json.validate[Exception] fold(
-      invalid => parseContent(json) fold(
-        invalid => throw new RuntimeException(invalid.toString()),
-        valid => Right(valid)),
-      valid => Left(valid)
-      )
+  private def getWithKey[T](path: String, addQueryString: Option[String] = None, secure: Boolean = false)
+                           (parse: JsValue => JsResult[T]): Future[Either[Exception, T]] = {
+    val queryString = addQueryString.foldLeft(s"key=$key")((keyParam, extraParams) => s"$keyParam&$extraParams")
+    get(path, queryString, secure)(parse)
   }
 
-  def lookUpUserId(email: String, password: String): Future[Either[Exception, String]] = {
-    val sig = md5(email + app.token)
-    val queryString = s"appid=${app.id}&sig=$sig&email=$email&pass=$password"
-    lookUp("account/lookup", queryString) map parse {
+  def getUserId: Future[Either[Exception, String]] = {
+    val sig = md5(userEmail + app.token)
+    val queryString = s"appid=${app.id}&sig=$sig&email=$userEmail&pass=$userPassword"
+    get("account/lookup", queryString) {
       json => (json \ "userid").validate[String]
     }
   }
 
-  def genToken: Future[Either[Exception, String]] = {
+  def getToken: Future[Either[Exception, String]] = {
     val sig = md5(userId + app.token)
     val queryString = s"userid=$userId&appid=${app.id}&sig=$sig"
-    get("account/token", queryString) map parse {
+    get("account/token", queryString) {
       json => (json \ "token").validate[String]
     }
   }
 
   def getContexts: Future[Either[Exception, Seq[Context]]] = {
-    getWithKey("contexts/get") map parse(_.validate[Seq[Context]])
+    getWithKey("contexts/get") {
+      _.validate[Seq[Context]]
+    }
   }
 
-  def getTasks(key: => String = key): Future[Either[Exception, Seq[Task]]] = {
-    getWithKey("tasks/get", Some("fields=context")) map parse {
+  def getTasks: Future[Either[Exception, Seq[Task]]] = {
+    getWithKey("tasks/get", Some("fields=context")) {
       json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
     }
   }
