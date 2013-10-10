@@ -51,7 +51,10 @@ object Toodledo {
     )(Context)
 
   private implicit val taskReads = (
-    (__ \ 'id).read[String].map(_.toInt) and (__ \ 'title).read[String] and (__ \ 'context).read[String].map(_.toInt)
+    (__ \ 'id).read[String].map(_.toInt) and
+      (__ \ 'title).read[String] and
+      (__ \ 'completed).read[Long] and
+      (__ \ 'context).read[String].map(_.toInt)
     )(Task)
 
   private def get[T](path: String, queryString: String, secure: Boolean = true)
