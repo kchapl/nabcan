@@ -1,9 +1,8 @@
 package controllers
 
 import play.api.mvc._
-import model.service.Toodledo
+import model.service.TaskRepository
 import scala.concurrent.ExecutionContext.Implicits.global
-
 
 object Application extends Controller {
 
@@ -12,7 +11,7 @@ object Application extends Controller {
   }
 
   def contexts = Action.async {
-    Toodledo.getContexts map {
+    TaskRepository.getContexts map {
       _ fold(
         e => InternalServerError(views.html.exception(e)),
         contexts => Ok(views.html.contexts(contexts))
@@ -21,7 +20,7 @@ object Application extends Controller {
   }
 
   def board(id: Int) = Action.async {
-    Toodledo.getTasksByContext(contextId = id) map {
+    TaskRepository.getBoard(id) map {
       _ fold(
         e => InternalServerError(views.html.exception(e)),
         tasks => Ok(views.html.board(tasks))

@@ -7,8 +7,9 @@
 <body>
 <ul>
     @for(context <- contexts) {
-    <li>@context.name [@context.id]</li>
+    <li><a href="/board/@context.id">@context.name</a></li>
     }
+    <li><a href="/board/0">None</a></li>
 </ul>
 </body>
 </html>
