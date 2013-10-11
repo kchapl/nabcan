@@ -12,6 +12,7 @@ import play.api.libs.json.JsArray
 import scala.Some
 import model.Context
 import model.Task
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object Toodledo {
 

@@ -2,14 +2,15 @@ package model.service
 
 import scala.concurrent.Future
 import model.{Context, Task}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object TaskRepository {
 
   def getContexts: Future[Either[Toodledo.Exception, Seq[Context]]] = Toodledo.getContexts
 
-  def getBoard(contextId: Int): Future[Either[Toodledo.Exception, Seq[(String, Seq[Task])]]] = {
+  def getBoard(contextId: Int): Future[Either[Toodledo.Exception, Map[String, Seq[Task]]]] = {
 
-    def groupTasks(tasks: Seq[Task]): Map[String, Seq[Task]] = {
+    def group(tasks: Seq[Task]): Map[String, Seq[Task]] = {
       tasks.groupBy(task => if (task.completed == 0) "Done" else "Todo")
     }
 
@@ -17,7 +18,7 @@ object TaskRepository {
       tasks fold(
         e => Left(e),
         tasks => Right {
-          tasks filter (_.contextId == contextId)
+          group(tasks filter (_.contextId == contextId))
         }
         )
   }

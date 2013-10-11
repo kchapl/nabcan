@@ -1,14 +1,17 @@
-@(tasks: Seq[model.Task])
+@(columns: Map[String, Seq[model.Task]])
 
 <html>
 <head>
     <title>Board</title>
 </head>
 <body>
+@for(column <- columns) {
+<p>@column._1</p>
 <ul>
-    @for(task <- tasks) {
+    @for(task <- column._2) {
     <li>@task.title</li>
     }
 </ul>
+}
 </body>
 </html>
