@@ -106,7 +106,7 @@ object Toodledo {
   }
 
   def getTasks: Future[Either[Exception, Seq[Task]]] = {
-    getWithKey("tasks/get", Some("fields=context")) {
+    getWithKey("tasks/get", Some("fields=context,status")) {
       json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
     }
   }

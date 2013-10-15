@@ -11,7 +11,7 @@ object TaskRepository {
   def getBoard(contextId: Int): Future[Either[Toodledo.Exception, Map[String, Seq[Task]]]] = {
 
     def group(tasks: Seq[Task]): Map[String, Seq[Task]] = {
-      tasks.groupBy(task => if (task.completed == 0) "Done" else "Todo")
+      tasks.groupBy(task => if (task.completed != 0) "Done" else "Todo")
     }
 
     for (tasks <- Toodledo.getTasks) yield
