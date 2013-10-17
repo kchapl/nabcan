@@ -54,6 +54,7 @@ object Toodledo {
   private implicit val taskReads = (
     (__ \ 'id).read[String].map(_.toInt) and
       (__ \ 'title).read[String] and
+      (__ \ 'status).read[String].map(_.toInt) and
       (__ \ 'completed).read[Long] and
       (__ \ 'context).read[String].map(_.toInt)
     )(Task)
