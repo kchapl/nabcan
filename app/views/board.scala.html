@@ -3,15 +3,24 @@
 <html>
 <head>
     <title>Board</title>
+    <link rel="stylesheet" media="screen" href='@routes.Assets.at("stylesheets/board.css")'>
 </head>
 <body>
+<div id="column-wrapper">
 @for(column <- columns) {
-<p>@column._1</p>
+<div class="column">
+<div class="column-header">
+<h2>@column._1</h2>
+</div>
+<div class="task-list">
 <ul>
     @for(task <- column._2) {
-    <li>@task.title</li>
+    <div class="task">@task.title</div>
     }
 </ul>
+</div>
+</div>
 }
+</div>
 </body>
 </html>
