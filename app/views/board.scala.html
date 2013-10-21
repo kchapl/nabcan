@@ -7,8 +7,10 @@
 </head>
 <body>
 <div id="column-wrapper">
+<table id="column-table">
+<tr>
 @for(column <- columns) {
-<div class="column">
+<td class="column">
 <div class="column-header">
 <h2>@column._1</h2>
 </div>
@@ -19,8 +21,9 @@
     }
 </ul>
 </div>
-</div>
+</td>
 }
+</tr>
 </div>
 </body>
 </html>
