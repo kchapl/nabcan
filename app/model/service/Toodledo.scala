@@ -39,7 +39,12 @@ object Toodledo {
   }
 
   private lazy val key = {
-    val sessionToken = Await.result(getToken, atMost = 30.seconds).right.get
+    val eitherExceptionOrToken = Await.result(getToken, atMost = 30.seconds)
+    val  x = eitherExceptionOrToken fold (
+      e  =>
+      token => token
+      )
+    val sessionToken = eitherExceptionOrToken.right.get
     md5(md5(userPassword) + app.token + sessionToken)
   }
 

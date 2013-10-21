@@ -1,29 +1,48 @@
 @(columns: Map[String, Seq[model.Task]])
 
+<!DOCTYPE HTML>
+
 <html>
 <head>
     <title>Board</title>
     <link rel="stylesheet" media="screen" href='@routes.Assets.at("stylesheets/board.css")'>
+    <script>
+        function allowDrop(ev) {
+            ev.preventDefault();
+        }
+
+        function drag(ev) {
+            ev.dataTransfer.setData("Text", ev.target.id);
+        }
+
+        function drop(ev) {
+            ev.preventDefault();
+            var data = ev.dataTransfer.getData("Text");
+            alert(data)
+            ev.target.appendChild(document.getElementById(data));
+        }
+    </script>
 </head>
 <body>
 <div id="column-wrapper">
-<table id="column-table">
-<tr>
-@for(column <- columns) {
-<td class="column">
-<div class="column-header">
-<h2>@column._1</h2>
-</div>
-<div class="task-list">
-<ul>
-    @for(task <- column._2) {
-    <div class="task">@task.title</div>
-    }
-</ul>
-</div>
-</td>
-}
-</tr>
+    <table id="column-table">
+        <tr>
+            @for(column <- columns) {
+            <td class="column">
+                <div class="column-header">
+                    <h2>@column._1</h2>
+                </div>
+                <div class="task-list" ondrop="drop(event)" ondragover="allowDrop(event)">
+                    <ul>
+                        @for(task <- column._2) {
+                        <div class="task" draggable="true" ondragstart="drag(event)">@task.title</div>
+                        }
+                    </ul>
+                </div>
+            </td>
+            }
+        </tr>
+    </table>
 </div>
 </body>
 </html>
