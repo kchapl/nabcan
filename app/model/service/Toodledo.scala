@@ -13,6 +13,7 @@ import scala.Some
 import model.Context
 import model.Task
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
 
 object Toodledo {
 
@@ -40,10 +41,6 @@ object Toodledo {
 
   private lazy val key = {
     val eitherExceptionOrToken = Await.result(getToken, atMost = 30.seconds)
-    val  x = eitherExceptionOrToken fold (
-      e  =>
-      token => token
-      )
     val sessionToken = eitherExceptionOrToken.right.get
     md5(md5(userPassword) + app.token + sessionToken)
   }
@@ -85,7 +82,9 @@ object Toodledo {
 
   private def getWithKey[T](path: String, addQueryString: Option[String] = None, secure: Boolean = false)
                            (parse: JsValue => JsResult[T]): Future[Either[Exception, T]] = {
-    val queryString = addQueryString.foldLeft(s"key=$key")((keyParam, extraParams) => s"$keyParam&$extraParams")
+    // TODO: chain together results of either on gettoken and this
+    val aKey = Try{key}
+    val queryString = addQueryString.foldLeft(s"key=$aKey")((keyParam, extraParams) => s"$keyParam&$extraParams")
     get(path, queryString, secure)(parse)
   }
 
