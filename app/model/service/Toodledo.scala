@@ -13,7 +13,7 @@ import scala.Some
 import model.Context
 import model.Task
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Try
+import scala.util.{Success, Failure, Try}
 
 object Toodledo {
 
@@ -39,7 +39,9 @@ object Toodledo {
     result.right.get
   }
 
-  private lazy val key = {
+  private def cachedKey = ???
+
+  private def key:Future[Either[Exception,String]] = {
     val eitherExceptionOrToken = Await.result(getToken, atMost = 30.seconds)
     val sessionToken = eitherExceptionOrToken.right.get
     md5(md5(userPassword) + app.token + sessionToken)
@@ -83,9 +85,15 @@ object Toodledo {
   private def getWithKey[T](path: String, addQueryString: Option[String] = None, secure: Boolean = false)
                            (parse: JsValue => JsResult[T]): Future[Either[Exception, T]] = {
     // TODO: chain together results of either on gettoken and this
-    val aKey = Try{key}
-    val queryString = addQueryString.foldLeft(s"key=$aKey")((keyParam, extraParams) => s"$keyParam&$extraParams")
-    get(path, queryString, secure)(parse)
+    val aKey = key
+    aKey match {
+      case Success(k) =>
+        val queryString = addQueryString.foldLeft(s"key=$aKey")((keyParam, extraParams) => s"$keyParam&$extraParams")
+        get(path, queryString, secure)(parse)
+      case Failure(e) =>
+        val queryString = addQueryString.foldLeft(s"key=$aKey")((keyParam, extraParams) => s"$keyParam&$extraParams")
+        get(path, queryString, secure)(parse)
+    }
   }
 
   def getUserId: Future[Either[Exception, String]] = {
