@@ -39,12 +39,17 @@ object Toodledo {
     result.right.get
   }
 
-  private def cachedKey = ???
+  private def cachedKey: Option[String] = ???
 
-  private def key:Future[Either[Exception,String]] = {
-    val eitherExceptionOrToken = Await.result(getToken, atMost = 30.seconds)
-    val sessionToken = eitherExceptionOrToken.right.get
-    md5(md5(userPassword) + app.token + sessionToken)
+  private def key: Future[Either[Exception, String]] = {
+    cachedKey match {
+      case Some(key) => Future(Right(key))
+      case None =>
+        getToken map (_ fold(
+          e => Left(e),
+          sessionToken => Right(md5(md5(userPassword) + app.token + sessionToken))
+          ))
+    }
   }
 
   private implicit val exceptionReads = (
