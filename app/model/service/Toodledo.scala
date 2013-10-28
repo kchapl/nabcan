@@ -12,12 +12,10 @@ import play.api.libs.json.JsArray
 import scala.Some
 import model.Context
 import model.Task
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Success, Failure, Try}
 
 object Toodledo {
 
-  case class Exception(id: Int, description: String)
+  case class Exception(id: Int, description: String) extends scala.Exception
 
   case class App(id: String, token: String)
 
@@ -35,21 +33,14 @@ object Toodledo {
 
   private lazy val userId = {
     // TODO: need to wait?
-    val result = Await.result(getUserId, atMost = 30.seconds)
-    result.right.get
+    Await.result(getUserId, atMost = 30.seconds)
   }
 
-  private def cachedKey: Option[String] = ???
-
-  private def key: Future[Either[Exception, String]] = {
-    cachedKey match {
-      case Some(key) => Future(Right(key))
-      case None =>
-        getToken map (_ fold(
-          e => Left(e),
-          sessionToken => Right(md5(md5(userPassword) + app.token + sessionToken))
-          ))
-    }
+  private def key: String = {
+    Await.result(for {
+      sessionToken <- getToken
+      key = md5(md5(userPassword) + app.token + sessionToken)
+    } yield key, atMost = 2.seconds)
   }
 
   private implicit val exceptionReads = (
@@ -69,7 +60,7 @@ object Toodledo {
     )(Task)
 
   private def get[T](path: String, queryString: String, secure: Boolean = true)
-                    (parse: JsValue => JsResult[T]): Future[Either[Exception, T]] = {
+                    (parse: JsValue => JsResult[T]): Future[T] = {
     val protocol = if (secure) "https" else "http"
     val url = s"$protocol://$apiUrl/$path.php?$queryString"
     // TODO :log
@@ -81,27 +72,36 @@ object Toodledo {
       json.validate[Exception] fold(
         invalid => parse(json) fold(
           invalid => throw new RuntimeException(invalid.toString()),
-          valid => Right(valid)),
-        valid => Left(valid)
+          valid => valid),
+        valid => throw valid
         )
     }
   }
 
   private def getWithKey[T](path: String, addQueryString: Option[String] = None, secure: Boolean = false)
-                           (parse: JsValue => JsResult[T]): Future[Either[Exception, T]] = {
-    // TODO: chain together results of either on gettoken and this
-    val aKey = key
-    aKey match {
-      case Success(k) =>
-        val queryString = addQueryString.foldLeft(s"key=$aKey")((keyParam, extraParams) => s"$keyParam&$extraParams")
-        get(path, queryString, secure)(parse)
-      case Failure(e) =>
-        val queryString = addQueryString.foldLeft(s"key=$aKey")((keyParam, extraParams) => s"$keyParam&$extraParams")
-        get(path, queryString, secure)(parse)
+                           (parse: JsValue => JsResult[T]): Future[T] = {
+    // TODO: toodledo exception to extend exception and use try instead of either constructs to catch at controller
+    val z = key map {
+      x =>
+
+        x.fold(
+          e => Left(e),
+
+          k =>
+
+            Right {
+
+              val queryString = addQueryString.foldLeft(s"key=$k")((keyParam, extraParams) => s"$keyParam&$extraParams")
+              get(path, queryString, secure)(parse)
+
+            }
+
+        )
+
     }
   }
 
-  def getUserId: Future[Either[Exception, String]] = {
+  def getUserId: Future[String] = {
     val sig = md5(userEmail + app.token)
     val queryString = s"appid=${app.id}&sig=$sig&email=$userEmail&pass=$userPassword"
     get("account/lookup", queryString) {
@@ -109,7 +109,7 @@ object Toodledo {
     }
   }
 
-  def getToken: Future[Either[Exception, String]] = {
+  def getToken: Future[String] = {
     val sig = md5(userId + app.token)
     val queryString = s"userid=$userId&appid=${app.id}&sig=$sig"
     get("account/token", queryString) {
@@ -117,15 +117,16 @@ object Toodledo {
     }
   }
 
-  def getContexts: Future[Either[Exception, Seq[Context]]] = {
+  def getContexts: Future[Seq[Context]] = {
     getWithKey("contexts/get") {
       _.validate[Seq[Context]]
     }
   }
 
-  def getTasks: Future[Either[Exception, Seq[Task]]] = {
+  def getTasks: Future[Seq[Task]] = {
     getWithKey("tasks/get", Some("fields=context,status")) {
       json => JsArray(json.asInstanceOf[JsArray].value.tail).validate[Seq[Task]]
     }
   }
+
 }
