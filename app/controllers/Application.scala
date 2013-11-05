@@ -6,6 +6,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object Application extends Controller {
 
+  // TODO catch exception coming from toodledo requests
+
   def index = Action {
     Ok(views.html.index("Your new application is ready."))
   }

@@ -1,14 +1,40 @@
 package model.service
 
-import scala.concurrent.Future
-import model.{Context, Task}
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Await, Future}
+import java.util.Properties
+import java.io.FileInputStream
+import model.toodledo.Digest._
+import model.Context
+import model.Task
+import scala.concurrent.duration._
+import model.service.ToodledoService.App
 
 object TaskRepository {
 
-  def getContexts: Future[Either[Toodledo.Exception, Seq[Context]]] = Toodledo.getContexts
+  // TODO: store these better
+  private val props = new Properties
+  props.load(new FileInputStream(sys.props.get("user.home").get + "/Desktop/tdconf"))
+  private val appId = props.getProperty("appId")
+  private val appToken = props.getProperty("appToken")
+  private val userEmail = props.getProperty("userEmail")
+  private val userPassword = props.getProperty("userPassword")
 
-  def getBoard(contextId: Int): Future[Either[Toodledo.Exception, Map[String, Seq[Task]]]] = {
+  private val app = App(appId, appToken)
+
+  private lazy val userId = {
+    Await.result(ToodledoService.getUserId(userEmail, userPassword, app), atMost = 2.seconds)
+  }
+
+  private lazy val key: String = {
+    Await.result(for {
+      sessionToken <- ToodledoService.getToken(userId, app)
+      key = md5(md5(userPassword) + app.token + sessionToken)
+    } yield key, atMost = 2.seconds)
+  }
+
+  def getContexts: Future[Seq[Context]] = ToodledoService.getContexts(key)
+
+  def getBoard(contextId: Int): Future[Map[String, Seq[Task]]] = {
 
     def group(tasks: Seq[Task]): Map[String, Seq[Task]] = {
       tasks groupBy {
@@ -27,12 +53,8 @@ object TaskRepository {
       }
     }
 
-    for (tasks <- Toodledo.getTasks) yield
-      tasks fold(
-        e => Left(e),
-        tasks => Right {
-          group(tasks filter (_.contextId == contextId))
-        }
-        )
+    for (tasks <- ToodledoService.getTasks(key)) yield
+      group(tasks filter (_.contextId == contextId))
   }
+
 }
