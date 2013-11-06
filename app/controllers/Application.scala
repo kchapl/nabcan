@@ -1,8 +1,11 @@
 package controllers
 
 import play.api.mvc._
-import model.service.TaskRepository
+import model.service.{ToodledoService, TaskRepository}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.util.Try
+import scala.concurrent.Future
+import model.Context
 
 object Application extends Controller {
 
@@ -13,11 +16,11 @@ object Application extends Controller {
   }
 
   def contexts = Action.async {
-    TaskRepository.getContexts map {
-      _ fold(
-        e => InternalServerError(views.html.exception(e)),
-        contexts => Ok(views.html.contexts(contexts))
-        )
+    val contexts2 = Try(TaskRepository.getContexts)
+    contexts2.
+    val contexts1 = TaskRepository.getContexts
+    contexts1 map {
+      c => Ok(views.html.contexts(c))
     }
   }
 
