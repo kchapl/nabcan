@@ -1,4 +1,4 @@
-package model.service
+package model
 
 import play.api.libs.json._
 import scala.concurrent.Future
@@ -7,9 +7,9 @@ import play.api.libs.ws.WS
 import model.toodledo.Digest._
 import play.api.libs.json.JsArray
 import scala.Some
-import model.Context
-import model.Task
+import scala.concurrent.ExecutionContext.Implicits.global
 
+// TODO: move to model package
 object ToodledoService {
 
   case class Exception(id: Int, description: String) extends scala.Exception

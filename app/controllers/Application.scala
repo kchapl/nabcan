@@ -1,26 +1,20 @@
 package controllers
 
 import play.api.mvc._
-import model.service.{ToodledoService, TaskRepository}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Success, Failure, Try}
-import scala.concurrent.Future
-import model.Context
+import model.{ToodledoService, TaskRepository}
 
 object Application extends Controller {
-
-  // TODO catch exception coming from toodledo requests
 
   def index = Action {
     Ok(views.html.index("Your new application is ready."))
   }
 
   def contexts = Action.async {
-    val contexts2 = TaskRepository.getContexts
-    contexts2 map {
-      x =>
-        val w = Try(x)
-        w match {
+    TaskRepository.getContexts map {
+      contexts =>
+        Try(contexts) match {
           case Success(c) => {
             Ok(views.html.contexts(c))
           }
@@ -35,10 +29,17 @@ object Application extends Controller {
 
   def board(id: Int) = Action.async {
     TaskRepository.getBoard(id) map {
-      _ fold(
-        e => InternalServerError(views.html.exception(e)),
-        tasks => Ok(views.html.board(tasks))
-        )
+      board =>
+        Try(board) match {
+          case Success(b) =>
+            Ok(views.html.board(b))
+          case Failure(ToodledoService.Exception(exceptionId, description)) => {
+            InternalServerError(views.html.exception(ToodledoService.Exception(exceptionId, description)))
+          }
+          case Failure(e) =>
+            throw e
+        }
     }
   }
+
 }
