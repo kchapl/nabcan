@@ -4,12 +4,9 @@ import scala.concurrent.{Await, Future}
 import java.util.Properties
 import java.io.FileInputStream
 import model.toodledo.Digest._
-import model.Context
-import model.Task
 import scala.concurrent.duration._
 import ToodledoService.App
 import scala.concurrent.ExecutionContext.Implicits.global
-import ToodledoService
 
 // TODO: move to model package
 object TaskRepository {
